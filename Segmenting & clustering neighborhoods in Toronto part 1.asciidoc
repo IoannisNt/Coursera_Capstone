@@ -1,0 +1,669 @@
+== Week 3 peer graded assignment: Segmenting & clustering neighborhoods in Toronto
+
+== What needs to be done for the purposes of the assignment constitutes of three parts. For simplification purposes, all three parts are going to be accessible through this particular notebook, in order to better track the assignment progress.
+
+== Part 1
+
+== At first we are going to import the necessary libraries to conduct the analysis.
+
+
++*In[40]:*+
+[source, ipython3]
+----
+import pandas as pd
+import numpy as np
+import requests
+import urllib.request
+import time
+----
+
+
++*In[41]:*+
+[source, ipython3]
+----
+! pip install bs4
+#The ! tells the notebook to execute the cell as a shell command.
+
+#Beautiful Soup is a Python library for pulling data out of HTML and XML files. 
+#It works with your favorite parser to provide idiomatic ways of navigating, searching, and modifying the parse tree. 
+#It commonly saves programmers hours or days of work.
+----
+
+
++*Out[41]:*+
+----
+Requirement already satisfied: bs4 in /home/jupyterlab/conda/envs/python/lib/python3.6/site-packages (0.0.1)
+Requirement already satisfied: beautifulsoup4 in /home/jupyterlab/conda/envs/python/lib/python3.6/site-packages (from bs4) (4.8.1)
+Requirement already satisfied: soupsieve>=1.2 in /home/jupyterlab/conda/envs/python/lib/python3.6/site-packages (from beautifulsoup4->bs4) (1.9.5)
+----
+
+
++*In[42]:*+
+[source, ipython3]
+----
+from bs4 import BeautifulSoup
+----
+
+
++*In[43]:*+
+[source, ipython3]
+----
+url = 'https://en.wikipedia.org/wiki/List_of_postal_codes_of_Canada:_M'
+response = requests.get(url)
+print('The response print: ', response)
+print('if the response print: <Response [200]>, this means that it went through!')
+
+soup = BeautifulSoup(response.content, 'html.parser')
+----
+
+
++*Out[43]:*+
+----
+The response print:  <Response [200]>
+if the response print: <Response [200]>, this means that it went through!
+----
+
+== Let’s create the table which is going to constitute our dataframe.
+
+
++*In[44]:*+
+[source, ipython3]
+----
+table = soup.find('table')
+table_headers = table.select('th')
+table_rows = table.select('tr')
+table_data = table.select('td')
+
+col1 = []
+col2 = []
+col3 = []
+colhead = []
+
+for i in range(0, len(table_data), 3):
+    col1.append(table_data[i].text.strip())
+    col2.append(table_data[i+1].text.strip())
+    col3.append(table_data[i+2].text.strip())
+    
+for h in table_headers:
+    colhead.append(h.text.strip())
+
+df_table = pd.DataFrame(data=[col1, col2, col3]).transpose()
+df_table.columns = colhead
+print('The dimensions of out dataframe are: ', df_table.shape)
+df_table.head()
+----
+
+
++*Out[44]:*+
+----
+The dimensions of out dataframe are:  (287, 3)
+
+[cols=",,,",options="header",]
+|===
+| |Postcode |Borough |Neighbourhood
+|0 |M1A |Not assigned |Not assigned
+|1 |M2A |Not assigned |Not assigned
+|2 |M3A |North York |Parkwoods
+|3 |M4A |North York |Victoria Village
+|4 |M5A |Downtown Toronto |Harbourfront
+|===
+----
+
+== Change the column names of the newly created dataframe in order for them to match the assignment requirements.
+
+
++*In[159]:*+
+[source, ipython3]
+----
+df_table.rename(columns={'Postcode':'PostalCode', 'Neighbourhood' : 'Neighborhood'}, inplace=True)
+df_table.head()
+----
+
+
++*Out[159]:*+
+----
+[cols=",,,",options="header",]
+|===
+| |PostalCode |Borough |Neighborhood
+|0 |M3A |North York |Parkwoods
+|1 |M4A |North York |Victoria Village
+|2 |M5A |Downtown Toronto |Harbourfront
+|3 |M6A |North York |Lawrence Heights
+|4 |M6A |North York |Lawrence Manor
+|===
+----
+
+== Proceed with what it’s necessary in order to fulfill the assignment requirements.
+
+
++*In[160]:*+
+[source, ipython3]
+----
+print('It appears we come across some missing data...But at what amount?')
+print('')
+df_table.replace('Not assigned', np.nan, inplace = True)
+
+missing_data = df_table.isnull()
+
+for col in missing_data.columns.values.tolist():
+    print(col)
+    print(missing_data[col].value_counts())
+    print('')
+----
+
+
++*Out[160]:*+
+----
+It appears we come across some missing data...But at what amount?
+
+PostalCode
+False    210
+Name: PostalCode, dtype: int64
+
+Borough
+False    210
+Name: Borough, dtype: int64
+
+Neighborhood
+False    210
+Name: Neighborhood, dtype: int64
+
+----
+
+
++*In[161]:*+
+[source, ipython3]
+----
+print('Nearly one third of our data seems to be missing from two out of three columns...What is the best practice?')
+print('')
+print('We have been told to "Only process the cells that have an assigned borough. Ignore cells with a borough that is "Not assigned".')
+print('We will drop the rows where a borough is not assigned.')
+
+df_table.dropna(subset = ['Borough'], axis = 0, inplace = True)
+#axis=0 means that the deletion takes place each iterative row.
+
+df_table.reset_index(drop = True, inplace = True)
+
+print('')
+print('The new dimensions of the df are: ', df_table.shape)
+df_table.head()
+----
+
+
++*Out[161]:*+
+----
+Nearly one third of our data seems to be missing from two out of three columns...What is the best practice?
+
+We have been told to "Only process the cells that have an assigned borough. Ignore cells with a borough that is "Not assigned".
+We will drop the rows where a borough is not assigned.
+
+The new dimensions of the df are:  (210, 3)
+
+[cols=",,,",options="header",]
+|===
+| |PostalCode |Borough |Neighborhood
+|0 |M3A |North York |Parkwoods
+|1 |M4A |North York |Victoria Village
+|2 |M5A |Downtown Toronto |Harbourfront
+|3 |M6A |North York |Lawrence Heights
+|4 |M6A |North York |Lawrence Manor
+|===
+----
+
+
++*In[162]:*+
+[source, ipython3]
+----
+print('In which columns does the Neighbourhood column present a NaN value?')
+print('')
+
+null_columns = df_table.columns[df_table.isnull().any()]
+
+null_cols = []
+
+for i in list(null_columns):
+    null_cols.append(i)
+    
+null_cols
+----
+
+
++*Out[162]:*+
+----
+In which columns does the Neighbourhood column present a NaN value?
+
+[]----
+
+
++*In[163]:*+
+[source, ipython3]
+----
+print('In which rows, for the columns we have already found, does the Neighbourhood column present a NaN value?')
+print('')
+for i in null_cols:
+    print(df_table[df_table[i].isnull()][null_columns])
+----
+
+
++*Out[163]:*+
+----
+In which rows, for the columns we have already found, does the Neighbourhood column present a NaN value?
+
+----
+
+
++*In[165]:*+
+[source, ipython3]
+----
+df_table['Neighborhood'].replace(np.nan, df_table.iloc[5][1], inplace=True)
+
+print('...and a check...:', df_table.iloc[5][2])
+----
+
+
++*Out[165]:*+
+----
+...and a check...: Queen's Park
+----
+
+== After all these steps, it is time to reach the finalized dataframe, to conclude the Part 1 of this assignment.
+
+
++*In[167]:*+
+[source, ipython3]
+----
+print('And now for the last requirement...')
+print('')
+df_table2 = df_table.groupby(['PostalCode', 'Borough'])['Neighborhood'].apply(', '.join).reset_index()
+
+print('Here the dimensions of our table are: ', df_table2.shape)
+df_table2.head(12)
+----
+
+
++*Out[167]:*+
+----
+And now for the last requirement...
+
+Here the dimensions of our table are:  (103, 3)
+
+[cols=",,,",options="header",]
+|===
+| |PostalCode |Borough |Neighborhood
+|0 |M1B |Scarborough |Rouge, Malvern
+|1 |M1C |Scarborough |Highland Creek, Rouge Hill, Port Union
+|2 |M1E |Scarborough |Guildwood, Morningside, West Hill
+|3 |M1G |Scarborough |Woburn
+|4 |M1H |Scarborough |Cedarbrae
+|5 |M1J |Scarborough |Scarborough Village
+|6 |M1K |Scarborough |East Birchmount Park, Ionview, Kennedy Park
+|7 |M1L |Scarborough |Clairlea, Golden Mile, Oakridge
+|8 |M1M |Scarborough |Cliffcrest, Cliffside, Scarborough Village West
+|9 |M1N |Scarborough |Birch Cliff, Cliffside West
+|10 |M1P |Scarborough |Dorset Park, Scarborough Town Centre, Wexford ...
+|11 |M1R |Scarborough |Maryvale, Wexford
+|===
+----
+
+== Part 2
+
+== We are going to have to install geocoder in order to be able to proceed.
+
+
++*In[172]:*+
+[source, ipython3]
+----
+! pip install geocoder
+----
+
+
++*Out[172]:*+
+----
+Collecting geocoder
+[?25l  Downloading https://files.pythonhosted.org/packages/4f/6b/13166c909ad2f2d76b929a4227c952630ebaf0d729f6317eb09cbceccbab/geocoder-1.38.1-py2.py3-none-any.whl (98kB)
+[K     |████████████████████████████████| 102kB 18.8MB/s ta 0:00:01
+[?25hCollecting ratelim (from geocoder)
+  Downloading https://files.pythonhosted.org/packages/f2/98/7e6d147fd16a10a5f821db6e25f192265d6ecca3d82957a4fdd592cad49c/ratelim-0.1.6-py2.py3-none-any.whl
+Requirement already satisfied: requests in /home/jupyterlab/conda/envs/python/lib/python3.6/site-packages (from geocoder) (2.22.0)
+Collecting future (from geocoder)
+[?25l  Downloading https://files.pythonhosted.org/packages/45/0b/38b06fd9b92dc2b68d58b75f900e97884c45bedd2ff83203d933cf5851c9/future-0.18.2.tar.gz (829kB)
+[K     |████████████████████████████████| 829kB 33.8MB/s eta 0:00:01
+[?25hRequirement already satisfied: six in /home/jupyterlab/conda/envs/python/lib/python3.6/site-packages (from geocoder) (1.13.0)
+Collecting click (from geocoder)
+[?25l  Downloading https://files.pythonhosted.org/packages/fa/37/45185cb5abbc30d7257104c434fe0b07e5a195a6847506c074527aa599ec/Click-7.0-py2.py3-none-any.whl (81kB)
+[K     |████████████████████████████████| 81kB 15.1MB/s eta 0:00:01
+[?25hRequirement already satisfied: decorator in /home/jupyterlab/conda/envs/python/lib/python3.6/site-packages (from ratelim->geocoder) (4.4.1)
+Requirement already satisfied: urllib3!=1.25.0,!=1.25.1,<1.26,>=1.21.1 in /home/jupyterlab/conda/envs/python/lib/python3.6/site-packages (from requests->geocoder) (1.25.7)
+Requirement already satisfied: chardet<3.1.0,>=3.0.2 in /home/jupyterlab/conda/envs/python/lib/python3.6/site-packages (from requests->geocoder) (3.0.4)
+Requirement already satisfied: idna<2.9,>=2.5 in /home/jupyterlab/conda/envs/python/lib/python3.6/site-packages (from requests->geocoder) (2.8)
+Requirement already satisfied: certifi>=2017.4.17 in /home/jupyterlab/conda/envs/python/lib/python3.6/site-packages (from requests->geocoder) (2019.11.28)
+Building wheels for collected packages: future
+  Building wheel for future (setup.py) ... [?25ldone
+[?25h  Stored in directory: /home/jupyterlab/.cache/pip/wheels/8b/99/a0/81daf51dcd359a9377b110a8a886b3895921802d2fc1b2397e
+Successfully built future
+Installing collected packages: ratelim, future, click, geocoder
+Successfully installed click-7.0 future-0.18.2 geocoder-1.38.1 ratelim-0.1.6
+----
+
+
++*In[173]:*+
+[source, ipython3]
+----
+import geocoder
+----
+
+== Now let’s reach the csv file in order to proceed.
+
+
++*In[186]:*+
+[source, ipython3]
+----
+# The given csv file is used for the lon and lat values
+!wget -O GeoCord.csv http://cocl.us/Geospatial_data/
+----
+
+
++*Out[186]:*+
+----
+--2019-12-10 12:10:29--  http://cocl.us/Geospatial_data/
+Resolving cocl.us (cocl.us)... 169.48.113.194
+Connecting to cocl.us (cocl.us)|169.48.113.194|:80... connected.
+HTTP request sent, awaiting response... 301 Moved Permanently
+Location: https://cocl.us/Geospatial_data/ [following]
+--2019-12-10 12:10:29--  https://cocl.us/Geospatial_data/
+Connecting to cocl.us (cocl.us)|169.48.113.194|:443... connected.
+HTTP request sent, awaiting response... 301 Moved Permanently
+Location: https://ibm.box.com/shared/static/9afzr83pps4pwf2smjjcf1y5mvgb18rr.csv [following]
+--2019-12-10 12:10:30--  https://ibm.box.com/shared/static/9afzr83pps4pwf2smjjcf1y5mvgb18rr.csv
+Resolving ibm.box.com (ibm.box.com)... 107.152.26.197, 107.152.27.197
+Connecting to ibm.box.com (ibm.box.com)|107.152.26.197|:443... connected.
+HTTP request sent, awaiting response... 301 Moved Permanently
+Location: /public/static/9afzr83pps4pwf2smjjcf1y5mvgb18rr.csv [following]
+--2019-12-10 12:10:31--  https://ibm.box.com/public/static/9afzr83pps4pwf2smjjcf1y5mvgb18rr.csv
+Reusing existing connection to ibm.box.com:443.
+HTTP request sent, awaiting response... 301 Moved Permanently
+Location: https://ibm.ent.box.com/public/static/9afzr83pps4pwf2smjjcf1y5mvgb18rr.csv [following]
+--2019-12-10 12:10:31--  https://ibm.ent.box.com/public/static/9afzr83pps4pwf2smjjcf1y5mvgb18rr.csv
+Resolving ibm.ent.box.com (ibm.ent.box.com)... 107.152.27.211, 107.152.26.211
+Connecting to ibm.ent.box.com (ibm.ent.box.com)|107.152.27.211|:443... connected.
+HTTP request sent, awaiting response... 302 Found
+Location: https://public.boxcloud.com/d/1/b1!IYwxCpgJN4hGRSJCASLgAyZbwvF_8fPY77RObL7svVSZWhkqp8MWXheboysyYshtFUhrS8zAsiKtZkPgVroXGyNMWUwT4Az5E3borwZVCyjWtY8sa0RzB36W7SL_ro0OyRukVex7mkybwDY0SzyDi0FqNbGebt5AC6hODyyqJF3oRCpTzAmVXqTOkFeKzBBJkLN8CF2WXLqyTPml3_sMhJ-QbMADFLzxGDqbcK-ncIVhbHNQwrn39HWtchm0JxiZriPNrTdtCLMO_ICdzcyyPIMZS-cIUJBRoqaoSgLwWV-Rz4f2GsRhOWwndx3lHrxcfzjwuhGMDuDgLAzxYtXnN_Q7hlRpZjLQH1EZaoYu_Bl3fJBgfwpjp07ulq7ieUSGuFFf0rQMQOFUUyzvaTIvI-7x-O-NE2ga_NZMJ0V8_T1lLWodM8ljOzOP151SRsRWXHl2WDNVrEojxlA6JFvjxTQhHhO1AqMIt5rqPX418n2N7mKIL41USGZ4jaTe48Pp2GVb6emQ586-dVltR49stXy-EuRfFLDJ4UcbA2piUI19oPU4s9fe2Kvy43A1tHCKzQGvVmEZrhx_V3eaf6Us_aP1Z8Pl5pC3dtwo2WRRAIENRVHtGM7gRhzIrQ-_o8BTiLj7OOCgIBFv6gWZV2SOJRh6UJiqcVCQ3aqNTBCL8TfjwquY0pu49cdlknIol1qYR6IFHTtQQalWPdtjrP8a1_VVaV4zifKxEi24OUOnCwr9uI3TANQxZRraInR9IQ6dkF5vhQmBJXywS2iMgMISNgo972hNsdkftI6A1hW28JgHl5XeOOfrhHIJ2DEHagYZER4ggd07WrCPdNNgqig5eAE7l-jj-vohmePJjisYB3Mw4QoTChcRr1Eo4wTtnonZcINjQBJZFCo3F_CshKhfBbxJrw5HItWTPdW-n_skbqLJW9IjBOzs-dfx3RnujynGalvS2l04S1Fc2qlhsPs2-p9WCK-3VOLp5bxeVTDqw1mn_PFEJyLq03ldO2JyuV7JAedDTD-KSTQ5W9LUpKDlMkOBtNZQ00PW-reCQ73vmxHSYtWGvzHQr-Mb8kSEzUG0OnSE_psDhDDT7g3lRmlb2xFbCd1hUCz0ZF9ZbyVui-8l7SiyHLiyqkMNOwSGpH72KSAGi5HsXOfIHGyZFYqgyIDRURdKlB1qwbUu43zTPhjxVM0o04gVEmFESetMO-flHd3q9fUOOlCXl8WgqWfXH6O2xaNwJ7I_ucuoK-5Rn0RVKBd-Ke8OifS-fc9XH98rxxI8xgpOu9ug9_7vR9VtqXGKaVUWXey0Noz810VWV4w06JyhGr0AtAP4RcLmEw3XNORw-oIDesRi4rbcMlaDxUfA2grTqnC10DPM3BamQ-abGy782GmrFh1Y0LK8/download [following]
+--2019-12-10 12:10:31--  https://public.boxcloud.com/d/1/b1!IYwxCpgJN4hGRSJCASLgAyZbwvF_8fPY77RObL7svVSZWhkqp8MWXheboysyYshtFUhrS8zAsiKtZkPgVroXGyNMWUwT4Az5E3borwZVCyjWtY8sa0RzB36W7SL_ro0OyRukVex7mkybwDY0SzyDi0FqNbGebt5AC6hODyyqJF3oRCpTzAmVXqTOkFeKzBBJkLN8CF2WXLqyTPml3_sMhJ-QbMADFLzxGDqbcK-ncIVhbHNQwrn39HWtchm0JxiZriPNrTdtCLMO_ICdzcyyPIMZS-cIUJBRoqaoSgLwWV-Rz4f2GsRhOWwndx3lHrxcfzjwuhGMDuDgLAzxYtXnN_Q7hlRpZjLQH1EZaoYu_Bl3fJBgfwpjp07ulq7ieUSGuFFf0rQMQOFUUyzvaTIvI-7x-O-NE2ga_NZMJ0V8_T1lLWodM8ljOzOP151SRsRWXHl2WDNVrEojxlA6JFvjxTQhHhO1AqMIt5rqPX418n2N7mKIL41USGZ4jaTe48Pp2GVb6emQ586-dVltR49stXy-EuRfFLDJ4UcbA2piUI19oPU4s9fe2Kvy43A1tHCKzQGvVmEZrhx_V3eaf6Us_aP1Z8Pl5pC3dtwo2WRRAIENRVHtGM7gRhzIrQ-_o8BTiLj7OOCgIBFv6gWZV2SOJRh6UJiqcVCQ3aqNTBCL8TfjwquY0pu49cdlknIol1qYR6IFHTtQQalWPdtjrP8a1_VVaV4zifKxEi24OUOnCwr9uI3TANQxZRraInR9IQ6dkF5vhQmBJXywS2iMgMISNgo972hNsdkftI6A1hW28JgHl5XeOOfrhHIJ2DEHagYZER4ggd07WrCPdNNgqig5eAE7l-jj-vohmePJjisYB3Mw4QoTChcRr1Eo4wTtnonZcINjQBJZFCo3F_CshKhfBbxJrw5HItWTPdW-n_skbqLJW9IjBOzs-dfx3RnujynGalvS2l04S1Fc2qlhsPs2-p9WCK-3VOLp5bxeVTDqw1mn_PFEJyLq03ldO2JyuV7JAedDTD-KSTQ5W9LUpKDlMkOBtNZQ00PW-reCQ73vmxHSYtWGvzHQr-Mb8kSEzUG0OnSE_psDhDDT7g3lRmlb2xFbCd1hUCz0ZF9ZbyVui-8l7SiyHLiyqkMNOwSGpH72KSAGi5HsXOfIHGyZFYqgyIDRURdKlB1qwbUu43zTPhjxVM0o04gVEmFESetMO-flHd3q9fUOOlCXl8WgqWfXH6O2xaNwJ7I_ucuoK-5Rn0RVKBd-Ke8OifS-fc9XH98rxxI8xgpOu9ug9_7vR9VtqXGKaVUWXey0Noz810VWV4w06JyhGr0AtAP4RcLmEw3XNORw-oIDesRi4rbcMlaDxUfA2grTqnC10DPM3BamQ-abGy782GmrFh1Y0LK8/download
+Resolving public.boxcloud.com (public.boxcloud.com)... 107.152.24.200
+Connecting to public.boxcloud.com (public.boxcloud.com)|107.152.24.200|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 2891 (2.8K) [text/csv]
+Saving to: ‘GeoCord.csv’
+
+GeoCord.csv         100%[===================>]   2.82K  --.-KB/s    in 0s      
+
+2019-12-10 12:10:32 (82.5 MB/s) - ‘GeoCord.csv’ saved [2891/2891]
+
+----
+
+
++*In[199]:*+
+[source, ipython3]
+----
+#importing the csv into a pandas dataframe
+Coordinates = pd.read_csv('GeoCord.csv')
+Coordinates.head()
+----
+
+
++*Out[199]:*+
+----
+[cols=",,,",options="header",]
+|===
+| |Postal Code |Latitude |Longitude
+|0 |M1B |43.806686 |-79.194353
+|1 |M1C |43.784535 |-79.160497
+|2 |M1E |43.763573 |-79.188711
+|3 |M1G |43.770992 |-79.216917
+|4 |M1H |43.773136 |-79.239476
+|===
+----
+
+
++*In[201]:*+
+[source, ipython3]
+----
+#I want to combine the two dataframes together, thus the column which will be used for this combination to take place, 
+#PostalCode, should have the same name in both of these dataframes
+Coordinates.rename(columns = {'Postal Code':"PostalCode"}, inplace = True)
+Coordinates.head()
+----
+
+
++*Out[201]:*+
+----
+[cols=",,,",options="header",]
+|===
+| |PostalCode |Latitude |Longitude
+|0 |M1B |43.806686 |-79.194353
+|1 |M1C |43.784535 |-79.160497
+|2 |M1E |43.763573 |-79.188711
+|3 |M1G |43.770992 |-79.216917
+|4 |M1H |43.773136 |-79.239476
+|===
+----
+
+== Let the dataframe combination take place.
+
+
++*In[203]:*+
+[source, ipython3]
+----
+df_table3 = pd.concat([df_table2, Coordinates], axis = 1)
+
+print('The dimensions of the new dataframe are the following:', df_table3.shape)
+print('')
+df_table3.head(12)
+----
+
+
++*Out[203]:*+
+----
+The dimensions of the new dataframe are the following: (103, 6)
+
+
+[cols=",,,,,,",options="header",]
+|===
+| |PostalCode |Borough |Neighborhood |PostalCode |Latitude |Longitude
+|0 |M1B |Scarborough |Rouge, Malvern |M1B |43.806686 |-79.194353
+
+|1 |M1C |Scarborough |Highland Creek, Rouge Hill, Port Union |M1C
+|43.784535 |-79.160497
+
+|2 |M1E |Scarborough |Guildwood, Morningside, West Hill |M1E |43.763573
+|-79.188711
+
+|3 |M1G |Scarborough |Woburn |M1G |43.770992 |-79.216917
+
+|4 |M1H |Scarborough |Cedarbrae |M1H |43.773136 |-79.239476
+
+|5 |M1J |Scarborough |Scarborough Village |M1J |43.744734 |-79.239476
+
+|6 |M1K |Scarborough |East Birchmount Park, Ionview, Kennedy Park |M1K
+|43.727929 |-79.262029
+
+|7 |M1L |Scarborough |Clairlea, Golden Mile, Oakridge |M1L |43.711112
+|-79.284577
+
+|8 |M1M |Scarborough |Cliffcrest, Cliffside, Scarborough Village West
+|M1M |43.716316 |-79.239476
+
+|9 |M1N |Scarborough |Birch Cliff, Cliffside West |M1N |43.692657
+|-79.264848
+
+|10 |M1P |Scarborough |Dorset Park, Scarborough Town Centre, Wexford ...
+|M1P |43.757410 |-79.273304
+
+|11 |M1R |Scarborough |Maryvale, Wexford |M1R |43.750072 |-79.295849
+|===
+----
+
+== Part 3
+
+
++*In[217]:*+
+[source, ipython3]
+----
+!conda install -c conda-forge geopy --yes
+!conda install -c conda-forge folium=0.5.0 --yes
+----
+
+
++*Out[217]:*+
+----
+Solving environment: done
+
+
+==> WARNING: A newer version of conda exists. <==
+  current version: 4.5.11
+  latest version: 4.7.12
+
+Please update conda by running
+
+    $ conda update -n base -c defaults conda
+
+
+
+# All requested packages already installed.
+
+Solving environment: done
+
+
+==> WARNING: A newer version of conda exists. <==
+  current version: 4.5.11
+  latest version: 4.7.12
+
+Please update conda by running
+
+    $ conda update -n base -c defaults conda
+
+
+
+# All requested packages already installed.
+
+----
+
+== We only want to work with boroughs which contain the word ``Toronto''.
+
+
++*In[218]:*+
+[source, ipython3]
+----
+df_table3['Borough'].value_counts()
+----
+
+
++*Out[218]:*+
+----North York          24
+Downtown Toronto    19
+Scarborough         17
+Etobicoke           11
+Central Toronto      9
+West Toronto         6
+York                 5
+East York            5
+East Toronto         5
+Mississauga          1
+Queen's Park         1
+Name: Borough, dtype: int64----
+
+== So now we create a dataframe, only containing the boroughs which have something to do with Toronto.
+
+
++*In[219]:*+
+[source, ipython3]
+----
+df_toronto = df_table3[df_table3['Borough'].str.contains('Toronto')]
+df_toronto.head()
+----
+
+
++*Out[219]:*+
+----
+[cols=",,,,,,",options="header",]
+|===
+| |PostalCode |Borough |Neighborhood |PostalCode |Latitude |Longitude
+|37 |M4E |East Toronto |The Beaches |M4E |43.676357 |-79.293031
+
+|41 |M4K |East Toronto |The Danforth West, Riverdale |M4K |43.679557
+|-79.352188
+
+|42 |M4L |East Toronto |The Beaches West, India Bazaar |M4L |43.668999
+|-79.315572
+
+|43 |M4M |East Toronto |Studio District |M4M |43.659526 |-79.340923
+
+|44 |M4N |Central Toronto |Lawrence Park |M4N |43.728020 |-79.388790
+|===
+----
+
+== Which are the coordinates of Toronto?
+
+
++*In[220]:*+
+[source, ipython3]
+----
+from geopy.geocoders import Nominatim
+address = 'Toronto, Canada'
+geolocator = Nominatim(user_agent="toronto_explorer")
+location = geolocator.geocode(address)
+latitude = location.latitude
+longitude = location.longitude
+print('The geograpical coordinate of Toronto are {}, {}.'.format(latitude, longitude))
+----
+
+
++*Out[220]:*+
+----
+The geograpical coordinate of Toronto are 43.653963, -79.387207.
+----
+
+== Now let’s visualize the map.
+
+
++*In[221]:*+
+[source, ipython3]
+----
+# Matplotlib and associated plotting modules
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+
+# import k-means
+from sklearn.cluster import KMeans
+
+import folium # map rendering library
+----
+
+
++*In[226]:*+
+[source, ipython3]
+----
+map_toronto = folium.Map(location=[latitude, longitude], zoom_start=11)
+
+# add markers to map
+for lat, lng, borough, neighborhood in zip(df_toronto['Latitude'], df_toronto['Longitude'], df_toronto['Borough'], df_toronto['Neighborhood']):
+    label = '{}, {}'.format(neighborhood, borough)
+    label = folium.Popup(label, parse_html=True)
+    folium.CircleMarker(
+        [lat, lng],
+        radius=5,
+        popup=label,
+        color='blue',
+        fill=True,
+        fill_color='#3186cc',
+        fill_opacity=0.7,
+        parse_html=False).add_to(map_toronto)  
+    
+map_toronto
+----
+
+
++*Out[226]:*+
+----
+
+----
